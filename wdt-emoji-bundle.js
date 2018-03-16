@@ -19,7 +19,8 @@
   var wdtEmojiBundle = {};
 
   wdtEmojiBundle.defaults = {
-    pickerColors : ['green', 'pink', 'yellow', 'blue', 'gray'],
+    localStorageKey : "recentEmotes",
+    pickerColors : ['gray'],
     textMode     : true,
     disabledCategories: ['Skin Tones'],
     sectionOrders: {
@@ -36,7 +37,7 @@
     },
     skinColor    : 'skin-1',
     allowNative  : false,
-    emojiType    : 'apple',
+    emojiType    : 'twitter',
     emojiSheets: {
       'apple'    : '/sheets/sheet_apple_64_indexed_128.png',
       'google'   : '/sheets/sheet_google_64_indexed_128.png',
@@ -69,6 +70,7 @@
     self.emoji.img_sets['emojione']['sheet'] = this.defaults.emojiSheets.emojione;
     self.emoji.img_sets['facebook']['sheet'] = this.defaults.emojiSheets.facebook;
     self.emoji.img_sets['messenger']['sheet'] = this.defaults.emojiSheets.messenger;
+    self.customEmojis = [];
 
     self.selector = selector;
     self.elements = document.querySelectorAll(selector);
@@ -273,6 +275,60 @@
     addClass(this, 'wdt-emoji-picker-open');
     this.innerHTML = wdtEmojiBundle.emoji.replace_colons(':sunglasses:');
   };
+  
+  wdtEmojiBundle.addCustomEmoji = function (name, short_name, img_url) {
+    var self = this;
+    self.customEmojis.push({
+      name: name,
+      short_name: short_name,
+      img_url: img_url,
+      custom: true
+    });
+  };
+  
+  wdtEmojiBundle.removeCustomEmoji = function (short_name) {
+    var self = this;
+    for (var i = 0; i < self.customEmojis.length; i++) {
+      if (short_name == self.customEmojis[i].short_name) {
+        self.customEmojis.splice(i, 1);
+        return;
+      }
+    }
+  };
+  
+  wdtEmojiBundle.listCustomEmojis = function () {
+    var self = this;
+    return self.customEmojis;
+  }
+  
+  // [{"short_name": "apple", "totalUsed": 12}, ..]
+  wdtEmojiBundle.addToRecentEmojis = function (short_name) {
+    var store = wdtEmojiBundle.getRecentEmojis();
+    var added = false;
+    for (var i = 0; i < store.length; i++) {
+      var item = store[i];
+      if (item.short_name == short_name) {
+        item.totalUsed++;
+        added = true;
+        break;
+      }
+    }
+    if (!added) {
+      store.push({
+        "short_name": short_name,
+        "totalUsed": 1
+      });
+    }
+    localStorage.setItem(this.defaults.localStorageKey, JSON.stringify(store));
+  };
+  
+  wdtEmojiBundle.getRecentEmojis = function () {
+    var store = localStorage.getItem(this.defaults.localStorageKey);
+    if (!store || store == "") {
+      return [];
+    }
+    return JSON.parse(store);
+  };
 
   /**
    *
@@ -284,13 +340,16 @@
 
     var self = this;
 
-    if (hasClass(this.popup, 'ready'))
-      return false;
+    // if (hasClass(this.popup, 'ready'))
+    //   return false;
 
     // @todo - [needim] - Support for recent and custom emoji list
     var sectionsContainer = this.popup.querySelector('.wdt-emoji-sections'),
-      sections = {'Recent': [], 'Custom': []},
+      sections = {'Recent': [], 'Custom': wdtEmojiBundle.listCustomEmojis()},
       sortedSections = [];
+    var recentEmotes = wdtEmojiBundle.getRecentEmojis();
+    
+    sectionsContainer.innerHTML = "";
 
     for (var category in wdtEmojiBundle.defaults.emojiData) {
       if (wdtEmojiBundle.defaults.emojiData.hasOwnProperty(category)) {
@@ -300,6 +359,22 @@
 
         emojiList = wdtEmojiBundle.defaults.emojiData[category];
         sections[category] = emojiList;
+        for (var emote in emojiList) {
+          for (var recent in recentEmotes) {
+            if (emojiList[emote].short_name == recentEmotes[recent].short_name) {
+              sections["Recent"].push(emojiList[emote]);
+            }
+          }
+        }
+      }
+    }
+    
+    var customEmotes = sections.Custom;
+    for (var i = 0; i < customEmotes.length; i++) {
+      for (var j = 0; j < recentEmotes.length; j++) {
+        if (customEmotes[i].short_name == recentEmotes[j].short_name) {
+          sections["Recent"].push(customEmotes[i]);
+        }
       }
     }
 
@@ -310,6 +385,26 @@
     for (var i = 0; i < sortedSectionsArray.length; i++) {
       sortedSections[sortedSectionsArray[i]] = sections[sortedSectionsArray[i]];
     }
+    
+    sections["Recent"].sort(function (a, b) {
+      var valA = 0;
+      var valB = 0;
+      for (var i = 0; i < recentEmotes.length; i++) {
+        var rEmote = recentEmotes[i];
+        if (a.short_name == rEmote.short_name) {
+          valA = rEmote.totalUsed;
+        }
+        if (b.short_name == rEmote.short_name) {
+          valB = rEmote.totalUsed;
+        }
+      }
+      console.log(a, valA, b, valB)
+      if (valA < valB) return 1;
+      if (valA > valB) return -1;
+      return 0;
+    });
+    
+    sortedSections["Recent"] = sortedSections["Recent"].slice(0, 24);
 
     for (var title in sortedSections) {
       if (sortedSections.hasOwnProperty(title)) {
@@ -330,11 +425,15 @@
           for (i = 0; i < emojiList.length; i++) {
             var em = emojiList[i];
 
-            if (em.has_img_apple || em.has_img_emojione || em.has_img_google || em.has_img_twitter || em.has_img_facebook || em.has_img_messenger) {
+            if (em.has_img_apple || em.has_img_emojione || em.has_img_google || em.has_img_twitter || em.has_img_facebook || em.has_img_messenger || em.custom) {
               var emojiLink = document.createElement('a');
 
               addClass(emojiLink, 'wdt-emoji');
               addClass(emojiLink, wdtEmojiBundle.getRandomPickerColor());
+              
+              if (em.custom) {
+                em.short_names = [em.short_name];
+              }
 
               emojiLink.dataset.hasImgApple = em.has_img_apple;
               emojiLink.dataset.hasImgEmojione = em.has_img_emojione;
@@ -346,8 +445,14 @@
               emojiLink.dataset.wdtEmojiShortnames = ':' + em.short_names.join(': :') + ':';
               emojiLink.dataset.wdtEmojiShortname = em.short_name;
               emojiLink.dataset.wdtEmojiOrder = em.sort_order;
-
-              emojiLink.innerHTML = self.emoji.replace_colons(':' + em.short_name + ':');
+              
+              if (em.custom) {
+                emojiLink.innerHTML = self.emoji.replace_colons(':' + em.short_name + ':', true, em.img_url);
+                emojiLink.dataset.wdtEmojiCustom = "true";
+                emojiLink.dataset.wdtEmojiCustomURL = em.img_url;
+              } else {
+                emojiLink.innerHTML = self.emoji.replace_colons(':' + em.short_name + ':');
+              }
 
               emojiListDiv.appendChild(emojiLink);
             }
@@ -360,7 +465,7 @@
       }
     }
 
-    addClass(this.popup, 'ready');
+    // addClass(this.popup, 'ready');
 
     wdtEmojiBundle.bindEvents();
   };
@@ -424,6 +529,7 @@
       var selection = getSelection(wdtEmojiBundle.input);
 
       replaceText(wdtEmojiBundle.input, selection, ':' + this.dataset.wdtEmojiShortname + ':');
+      wdtEmojiBundle.addToRecentEmojis(this.dataset.wdtEmojiShortname);
       fire('select', {el: wdtEmojiBundle.input, event: event, emoji: ':' + this.dataset.wdtEmojiShortname + ':'});
 
       var ce = document.createEvent('Event');
@@ -453,8 +559,11 @@
       wdtEmojiBundle.previewTimer = setTimeout(function () {
 
         addClass(wdtEmojiBundle.popup, 'preview-mode');
-
-        wdtEmojiBundle.previewImg.innerHTML = self.emoji.replace_colons(':' + emo.dataset.wdtEmojiShortname + ':');
+        if (emo.dataset.wdtEmojiCustom == "true") {
+          wdtEmojiBundle.previewImg.innerHTML = self.emoji.replace_colons(':' + emo.dataset.wdtEmojiShortname + ':', true, emo.dataset.wdtEmojiCustomURL);
+        } else {
+          wdtEmojiBundle.previewImg.innerHTML = self.emoji.replace_colons(':' + emo.dataset.wdtEmojiShortname + ':');
+        }
         wdtEmojiBundle.previewName.innerHTML = emo.dataset.wdtEmojiShortname;
         wdtEmojiBundle.previewAliases.innerHTML = emo.dataset.wdtEmojiShortnames;
 

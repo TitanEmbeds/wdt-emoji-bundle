@@ -230,7 +230,7 @@
    * @returns {string} A new string with all colon string emoticons replaced
    * with the appropriate representation.
    */
-  emoji.prototype.replace_colons = function (str) {
+  emoji.prototype.replace_colons = function (str, custom, custom_url) {
     var self = this;
     self.init_colons();
 
@@ -257,6 +257,9 @@
         } else {
           return ':' + idx + ':' + self.replacement(skin_val, skin_idx, ':');
         }
+      } else if (custom) {
+        var style = 'background: url(' + custom_url + '); background-size: contain;';
+        return '<span class="emoji-outer emoji-sizer"><span class="emoji-inner" style="' + style + '">';
       } else {
         var val = self.map.colons[idx];
         return val ? self.replacement(val, idx, ':') : m;
