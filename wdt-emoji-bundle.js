@@ -398,7 +398,6 @@
           valB = rEmote.totalUsed;
         }
       }
-      console.log(a, valA, b, valB)
       if (valA < valB) return 1;
       if (valA > valB) return -1;
       return 0;
