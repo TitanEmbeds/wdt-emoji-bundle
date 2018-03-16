@@ -517,6 +517,10 @@
    */
   wdtEmojiBundle.bindEvents = function () {
     var self = this;
+    if (self.blinded) {
+      return;
+    }
+    self.blinded = true;
     var stickers = document.querySelectorAll('.wdt-emoji-section h3');
     if (stickers.length) {
       for (var i = 0; i < stickers.length; i++) {
