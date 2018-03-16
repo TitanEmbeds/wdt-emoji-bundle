@@ -258,7 +258,7 @@
           return ':' + idx + ':' + self.replacement(skin_val, skin_idx, ':');
         }
       } else if (custom) {
-        var style = 'background: url(' + custom_url + '); background-size: contain;';
+        var style = 'background: url(' + custom_url + '); background-size: contain; background-repeat: no-repeat; background-position: center;';
         return '<span class="emoji-outer emoji-sizer"><span class="emoji-inner" style="' + style + '">';
       } else {
         var val = self.map.colons[idx];
